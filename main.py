@@ -11,11 +11,35 @@ class RepoWrapper:
     def __init__(self, repo_dir):
         try:
             self._repo = pygit2.Repository(os.path.join(repo_dir, '.git'))
+            self.stats = {}
+            self.refresh()
         except pygit2.GitError:
             raise RepoWrapperError()
 
     def fetch(self, remote="origin"):
         self._repo.remotes[remote].fetch()
+
+    def refresh(self):
+        branch_info = {}
+        for b in self._repo.branches.local:
+            try:
+                branch_info[b] = self.compare_with_upstream(b)
+            except:
+                pass
+        self.stats['branch'] = branch_info
+        self.stats['branch'] = {
+            b:self.compare_with_upstream(b)
+            for b in self._repo.branches.local
+            if self._repo.branches[b].upstream is not None
+        }
+        self.stats['local-only'] = [
+            b
+            for b in self._repo.branches.local
+            if self._repo.branches[b].upstream is None
+        ]
+        self.stats['modified'], self.stats['new'] = self.digested_status()
+
+        self.stats['clean'] = not (self.stats['new'] or self.stats['modified'])
 
     def compare_with_upstream(self, branch_name='master'):
         branch = self._repo.branches[branch_name]
@@ -35,7 +59,22 @@ class RepoWrapper:
         print(info_tuple)
         print('{} has {} commits that {} doesn\'t have.'.format(branch.name, info_tuple[0], upstream.name))
         print('{} has {} commits that {} doesn\'t have.'.format(upstream.name, info_tuple[1], branch.name))
-
+    def should_just_push(self):
+        info_tuple = self.compare_with_upstream()
+        modified, untracked = self.digested_status()
+        return self.workdir_is_clean() and info_tuple[1] == 0 and info_tuple[0] != 0
+    def should_just_pull(self):
+        info_tuple = self.compare_with_upstream()
+        return self.workdir_is_clean() and info_tuple[0] == 0 and info_tuple[1] != 0
+    def workdir_is_clean(self):
+        modified, untracked = self.digested_status()
+        return len(modified) + len(untracked) == 0
+    def unstaged_changes(self):
+        modified, untracked = self.digested_status()
+        return modified
+    def untracked_files(self):
+        modified, untracked = self.digested_status()
+        return untracked
     def has_stuff_to_push(self):
         try:
             if self.compare_with_upstream()[0] != 0:
@@ -74,6 +113,17 @@ class RepoWrapper:
             else:
                 print("Unhandled flag {} for file {}".format(flags, filepath))
                 raise RepoWrapperError()
+    def tell_me_what_to_do(self):
+        if self.unstaged_changes() + self.untracked_files():
+            print("repo {} has DIRTY work directory".format(self._repo.workdir))
+        elif self.should_just_pull():
+            print("repo {} You can FAST FORWARD MERGE".format(self._repo.workdir))
+        elif self.should_just_push():
+            print("repo {} You can just PUSH".format(self._repo.workdir))
+        elif self.compare_with_upstream() == (0,0):
+            pass
+        else:
+            print("repo {} Other case".format(self._repo.workdir))
 
 def get_repos_from_dir(dir):
     realpath = os.path.expanduser(dir)
@@ -87,6 +137,22 @@ def get_repos_from_dir(dir):
             pass
 
     return repos
+number = 0
+
+class RepoDir:
+    def __init__(self, dir='.'):
+        self.dir = dir
+        self.repos = []
+        self.non_repos = []
+        for d in os.listdir(dir):
+            try:
+                repo = RepoWrapper(os.path.join(dir,d))
+                self.repos.append(repo)
+            except RepoWrapperError:
+                self.non_repos.append(d)
+
+    def __iter__(self):
+        return iter(self.repos)
 
 class RepoManager(MutableSet):
     def __init__(self):
@@ -96,18 +162,27 @@ class RepoManager(MutableSet):
         # and one other container for individual repos
         # Like github is a directory
         # and ~/.philconfig is a single repo whose parent directory doesn't matter.
-
+        self.repo_dirs = set()
     def status(self):
+        global number
         for repo in self.repos:
             # print("repo = {}".format(repo._repo.workdir))
-            if repo.has_stuff_to_push():
-                print("Repo {} has stuff to push".format(repo._repo.workdir))
+            try:
+                repo.tell_me_what_to_do()
+            except Exception as e:
+                print("ERROR : repo {} : ".format(repo._repo.workdir) + str(e))
+
+        for repo_dir in self.repo_dirs:
+            for repo in repo_dir:
+                try:
+                    repo.tell_me_what_to_do()
+                except Exception as e:
+                    print("ERROR : repo {} : ".format(repo._repo.workdir) + str(e))
+
 
     def add_dir(self, dir):
         realpath = os.path.expanduser(dir)
-        for repo in os.listdir(realpath):
-            try: self.repos.add(RepoWrapper(os.path.join(github, repo)))
-            except RepoWrapperError: pass
+        self.repo_dirs.add(RepoDir(realpath))
     # TODO : Warn user of non-repos contained in directory
 
     def report(self):
@@ -135,10 +210,11 @@ class RepoManager(MutableSet):
 
 if __name__ == "__main__":
     repo = RepoWrapper('../flask_test/')
-    info = repo._repo.ahead_behind('db7ac576792ecf5041b800ec90c533400e5eae60', 'a9f9007904385781d9c7ab1c6670b0293ca61095')
+    #info = repo._repo.ahead_behind('db7ac576792ecf5041b800ec90c533400e5eae60',
+    # 'a9f9007904385781d9c7ab1c6670b0293ca61095')
 
     github = os.path.expanduser('~/Documents/GitHub')
-    repo_list = get_repos_from_dir(github)
+    #repo_list = get_repos_from_dir(github)
 
     rm = RepoManager()
     rm.add_dir(github)
@@ -151,8 +227,22 @@ if __name__ == "__main__":
     # print(github)
     # print([r._repo.workdir for r in repo_list])
 
-    print(len(repo_list))
+    #print(len(repo_list))
 
-    print(len(rm))
+    #print(len(rm))
 
+    # rm.status()
     rm.status()
+    #pprint(repo.stats)
+    #for b, info_tuple in repo.stats['branch'].items():
+    #    print("{}:{}".format(b, info_tuple))
+    # print(number)
+
+
+
+    # TODO If there are non-git-repos in a directory, inform user
+    # TODO Do this for all remotes, or maybe configurable
+    # TODO For all branches, compare_inf9 = (!0, !0), inform user
+    # TODO If working directory is dirty, inform user
+    # TODO For all branches, compare_info = (0, !=0), do merge
+    # TODO For all branches, compare_info = (!= 0, 0), do_push
