@@ -60,21 +60,14 @@ class RepoWrapper:
         print('{} has {} commits that {} doesn\'t have.'.format(branch.name, info_tuple[0], upstream.name))
         print('{} has {} commits that {} doesn\'t have.'.format(upstream.name, info_tuple[1], branch.name))
     def should_just_push(self):
-        info_tuple = self.compare_with_upstream()
-        modified, untracked = self.digested_status()
-        return self.workdir_is_clean() and info_tuple[1] == 0 and info_tuple[0] != 0
+        info_tuple = self.stats['branch']['master']
+        return self.stats['clean'] and info_tuple[1] == 0 and info_tuple[0] != 0
     def should_just_pull(self):
-        info_tuple = self.compare_with_upstream()
-        return self.workdir_is_clean() and info_tuple[0] == 0 and info_tuple[1] != 0
+        info_tuple = self.stats['branch']['master']
+        return self.stats['clean'] and info_tuple[0] == 0 and info_tuple[1] != 0
     def workdir_is_clean(self):
-        modified, untracked = self.digested_status()
-        return len(modified) + len(untracked) == 0
-    def unstaged_changes(self):
-        modified, untracked = self.digested_status()
-        return modified
-    def untracked_files(self):
-        modified, untracked = self.digested_status()
-        return untracked
+        return self.stats['clean']
+
     def has_stuff_to_push(self):
         try:
             if self.compare_with_upstream()[0] != 0:
@@ -114,7 +107,7 @@ class RepoWrapper:
                 print("Unhandled flag {} for file {}".format(flags, filepath))
                 raise RepoWrapperError()
     def tell_me_what_to_do(self):
-        if self.unstaged_changes() + self.untracked_files():
+        if not self.stats['clean']:
             print("repo {} has DIRTY work directory".format(self._repo.workdir))
         elif self.should_just_pull():
             print("repo {} You can FAST FORWARD MERGE".format(self._repo.workdir))
