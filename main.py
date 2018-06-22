@@ -21,13 +21,6 @@ class RepoWrapper:
         self._repo.remotes[remote].fetch()
 
     def refresh(self):
-        branch_info = {}
-        for b in self._repo.branches.local:
-            try:
-                branch_info[b] = self.compare_with_upstream(b)
-            except:
-                pass
-        self.stats['branch'] = branch_info
         self.stats['branch'] = {
             b: self.compare_with_upstream(b)
             for b in self._repo.branches.local
@@ -43,8 +36,14 @@ class RepoWrapper:
         self.stats['remotes'] = {r.name: r.url for r in self._repo.remotes}
 
     def compare_with_upstream(self, branch_name='master'):
-        branch = self._repo.branches[branch_name]
-        upstream = branch.upstream
+        try:
+            branch = self._repo.branches[branch_name]
+        except KeyError:
+            print(self._repo.name + "has no branch named " + branch_name)
+        try:
+            upstream = branch.upstream
+        except pygit2.GitError:
+            print(self._repo.name + ": branch {} has no upstream".format(branch_name))
         return self._repo.ahead_behind(branch.target, upstream.target)
 
     def up_to_date(self):
@@ -54,7 +53,10 @@ class RepoWrapper:
         return True
 
     def branch_info(self, branch_name='master'):
-        branch = self._repo.branches[branch_name]
+        try:
+            branch = self._repo.branches[branch_name]
+        except KeyError:
+            print(self._repo.name + "has no branch named " + branch_name)
         upstream = branch.upstream
         info_tuple = self._repo.ahead_behind(branch.target, upstream.target)
         print(info_tuple)
@@ -62,11 +64,20 @@ class RepoWrapper:
         print('{} has {} commits that {} doesn\'t have.'.format(upstream.name, info_tuple[1], branch.name))
 
     def should_just_push(self):
-        info_tuple = self.stats['branch']['master']
+        try:
+            info_tuple = self.stats['branch']['master']
+        except KeyError:
+            print(self._repo.workdir + "has no branch named " + 'master')
+            return False
         return self.stats['clean'] and info_tuple[1] == 0 and info_tuple[0] != 0
 
     def should_just_pull(self):
-        info_tuple = self.stats['branch']['master']
+
+        try:
+            info_tuple = self.stats['branch']['master']
+        except KeyError:
+            print(self._repo.workdir + "has no branch named " + 'master')
+            return False
         return self.stats['clean'] and info_tuple[0] == 0 and info_tuple[1] != 0
 
     def workdir_is_clean(self):
@@ -85,13 +96,21 @@ class RepoWrapper:
             print("Could not get status for repo {}".format(self._repo.workdir))
 
     def digested_status(self):
-        modified = []
-        new = []
-        for filepath, flags in self._repo.status().items():
-            if flags in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_INDEX_MODIFIED]:
-                modified.append(filepath)
-            elif flags in [pygit2.GIT_STATUS_WT_NEW, pygit2.GIT_STATUS_INDEX_NEW]:
-                new.append(filepath)
+        st = self._repo.status().items()
+        modified = [
+            filepath
+            for filepath, flags in st if flags in [
+                pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_INDEX_MODIFIED
+            ]
+
+        ]
+        new = [
+            filepath
+            for filepath, flags in st if flags in [
+                pygit2.GIT_STATUS_WT_NEW, pygit2.GIT_STATUS_INDEX_NEW
+            ]
+
+        ]
         return modified, new
 
     def status(self):
@@ -114,15 +133,15 @@ class RepoWrapper:
 
     def tell_me_what_to_do(self):
         if not self.stats['clean']:
-            print("repo {} has DIRTY work directory".format(self._repo.workdir))
+            print('\033[0;31m'"repo {} has DIRTY work directory".format(self._repo.workdir) + '\033[0;0m')
         elif self.should_just_pull():
-            print("repo {} You can FAST FORWARD MERGE".format(self._repo.workdir))
+            print('\033[0;33m'"repo {} You can FAST FORWARD MERGE".format(self._repo.workdir) + '\033[0;0m')
         elif self.should_just_push():
-            print("repo {} You can just PUSH".format(self._repo.workdir))
-        elif self.compare_with_upstream() == (0, 0):
-            pass
+            print('\033[0;33m'"repo {} You can just PUSH".format(self._repo.workdir) + '\033[0;0m')
+        elif 'master' in self.stats['branch'] and self.stats['branch']['master'] == (0, 0):
+            print('\033[0;32m'"repo {} Is clean and up to date".format(self._repo.workdir) + '\033[0;0m')
         else:
-            print("repo {} Other case".format(self._repo.workdir))
+            print('\033[0;31m' "repo {} DIVERGED".format(self._repo.workdir) + '\033[0;0m')
 
 
 def get_repos_from_dir(dir):
@@ -169,20 +188,12 @@ class RepoManager(MutableSet):
         self.repo_dirs = set()
 
     def status(self):
-        global number
         for repo in self.repos:
-            # print("repo = {}".format(repo._repo.workdir))
-            try:
-                repo.tell_me_what_to_do()
-            except Exception as e:
-                print("ERROR : repo {} : ".format(repo._repo.workdir) + str(e))
+            repo.tell_me_what_to_do()
 
         for repo_dir in self.repo_dirs:
             for repo in repo_dir:
-                try:
-                    repo.tell_me_what_to_do()
-                except Exception as e:
-                    print("ERROR : repo {} : ".format(repo._repo.workdir) + str(e))
+                repo.tell_me_what_to_do()
 
     def add_dir(self, dir):
         realpath = os.path.expanduser(dir)
@@ -221,7 +232,7 @@ if __name__ == "__main__":
     # repo_list = get_repos_from_dir(github)
 
     rm = RepoManager()
-    # rm.add_dir(github)
+    rm.add_dir(github)
     rm.add(os.path.expanduser('~/.philconfig'))
 
     # repo.branch_info('master')
@@ -236,8 +247,8 @@ if __name__ == "__main__":
     # print(len(rm))
 
     # rm.status()
-    # rm.status()
-    pprint(repo.stats)
+    rm.status()
+    # pprint(repo.stats)
     # for b, info_tuple in repo.stats['branch'].items():
     #    print("{}:{}".format(b, info_tuple))
     # print(number)
