@@ -37,13 +37,16 @@ class RepoWrapper:
         print('{} has {} commits that {} doesn\'t have.'.format(upstream.name, info_tuple[1], branch.name))
 
     def has_stuff_to_push(self):
-        if self.compare_with_upstream()[0]:
-            return True
-        mod, new = self.digested_status()
-        if mod or new:
-            return True
+        try:
+            if self.compare_with_upstream()[0] != 0:
+                return True
+            mod, new = self.digested_status()
+            if mod or new:
+                return True
 
-        return False
+            return False
+        except:
+            print("Could not get status for repo {}".format(self._repo.workdir))
 
     def digested_status(self):
         modified = []
