@@ -28,7 +28,7 @@ class RepoWrapper:
                 pass
         self.stats['branch'] = branch_info
         self.stats['branch'] = {
-            b:self.compare_with_upstream(b)
+            b: self.compare_with_upstream(b)
             for b in self._repo.branches.local
             if self._repo.branches[b].upstream is not None
         }
@@ -38,8 +38,8 @@ class RepoWrapper:
             if self._repo.branches[b].upstream is None
         ]
         self.stats['modified'], self.stats['new'] = self.digested_status()
-
         self.stats['clean'] = not (self.stats['new'] or self.stats['modified'])
+        self.stats['remotes'] = {r.name: r.url for r in self._repo.remotes}
 
     def compare_with_upstream(self, branch_name='master'):
         branch = self._repo.branches[branch_name]
