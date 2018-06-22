@@ -3,6 +3,7 @@ import os
 from pprint import pprint
 from collections.abc import MutableSet
 
+
 class RepoWrapperError(Exception):
     pass
 
@@ -48,7 +49,7 @@ class RepoWrapper:
 
     def up_to_date(self):
         for branch in self._repo.branches.local:
-            if self.compare_with_upstream(branch) != (0,0):
+            if self.compare_with_upstream(branch) != (0, 0):
                 return False
         return True
 
@@ -59,12 +60,15 @@ class RepoWrapper:
         print(info_tuple)
         print('{} has {} commits that {} doesn\'t have.'.format(branch.name, info_tuple[0], upstream.name))
         print('{} has {} commits that {} doesn\'t have.'.format(upstream.name, info_tuple[1], branch.name))
+
     def should_just_push(self):
         info_tuple = self.stats['branch']['master']
         return self.stats['clean'] and info_tuple[1] == 0 and info_tuple[0] != 0
+
     def should_just_pull(self):
         info_tuple = self.stats['branch']['master']
         return self.stats['clean'] and info_tuple[0] == 0 and info_tuple[1] != 0
+
     def workdir_is_clean(self):
         return self.stats['clean']
 
@@ -84,11 +88,12 @@ class RepoWrapper:
         modified = []
         new = []
         for filepath, flags in self._repo.status().items():
-            if   flags in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_INDEX_MODIFIED]:
+            if flags in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_INDEX_MODIFIED]:
                 modified.append(filepath)
-            elif flags in [pygit2.GIT_STATUS_WT_NEW,      pygit2.GIT_STATUS_INDEX_NEW]:
+            elif flags in [pygit2.GIT_STATUS_WT_NEW, pygit2.GIT_STATUS_INDEX_NEW]:
                 new.append(filepath)
         return modified, new
+
     def status(self):
         st = self._repo.status()
         for filepath, flags in self._repo.status().items():
@@ -106,6 +111,7 @@ class RepoWrapper:
             else:
                 print("Unhandled flag {} for file {}".format(flags, filepath))
                 raise RepoWrapperError()
+
     def tell_me_what_to_do(self):
         if not self.stats['clean']:
             print("repo {} has DIRTY work directory".format(self._repo.workdir))
@@ -113,10 +119,11 @@ class RepoWrapper:
             print("repo {} You can FAST FORWARD MERGE".format(self._repo.workdir))
         elif self.should_just_push():
             print("repo {} You can just PUSH".format(self._repo.workdir))
-        elif self.compare_with_upstream() == (0,0):
+        elif self.compare_with_upstream() == (0, 0):
             pass
         else:
             print("repo {} Other case".format(self._repo.workdir))
+
 
 def get_repos_from_dir(dir):
     realpath = os.path.expanduser(dir)
@@ -130,7 +137,10 @@ def get_repos_from_dir(dir):
             pass
 
     return repos
+
+
 number = 0
+
 
 class RepoDir:
     def __init__(self, dir='.'):
@@ -139,13 +149,14 @@ class RepoDir:
         self.non_repos = []
         for d in os.listdir(dir):
             try:
-                repo = RepoWrapper(os.path.join(dir,d))
+                repo = RepoWrapper(os.path.join(dir, d))
                 self.repos.append(repo)
             except RepoWrapperError:
                 self.non_repos.append(d)
 
     def __iter__(self):
         return iter(self.repos)
+
 
 class RepoManager(MutableSet):
     def __init__(self):
@@ -156,6 +167,7 @@ class RepoManager(MutableSet):
         # Like github is a directory
         # and ~/.philconfig is a single repo whose parent directory doesn't matter.
         self.repo_dirs = set()
+
     def status(self):
         global number
         for repo in self.repos:
@@ -172,10 +184,10 @@ class RepoManager(MutableSet):
                 except Exception as e:
                     print("ERROR : repo {} : ".format(repo._repo.workdir) + str(e))
 
-
     def add_dir(self, dir):
         realpath = os.path.expanduser(dir)
         self.repo_dirs.add(RepoDir(realpath))
+
     # TODO : Warn user of non-repos contained in directory
 
     def report(self):
@@ -200,17 +212,16 @@ class RepoManager(MutableSet):
         return len(self.repos)
 
 
-
 if __name__ == "__main__":
     repo = RepoWrapper('../flask_test/')
-    #info = repo._repo.ahead_behind('db7ac576792ecf5041b800ec90c533400e5eae60',
+    # info = repo._repo.ahead_behind('db7ac576792ecf5041b800ec90c533400e5eae60',
     # 'a9f9007904385781d9c7ab1c6670b0293ca61095')
 
     github = os.path.expanduser('~/Documents/GitHub')
-    #repo_list = get_repos_from_dir(github)
+    # repo_list = get_repos_from_dir(github)
 
     rm = RepoManager()
-    rm.add_dir(github)
+    # rm.add_dir(github)
     rm.add(os.path.expanduser('~/.philconfig'))
 
     # repo.branch_info('master')
@@ -220,14 +231,14 @@ if __name__ == "__main__":
     # print(github)
     # print([r._repo.workdir for r in repo_list])
 
-    #print(len(repo_list))
+    # print(len(repo_list))
 
-    #print(len(rm))
+    # print(len(rm))
 
     # rm.status()
-    rm.status()
-    #pprint(repo.stats)
-    #for b, info_tuple in repo.stats['branch'].items():
+    # rm.status()
+    pprint(repo.stats)
+    # for b, info_tuple in repo.stats['branch'].items():
     #    print("{}:{}".format(b, info_tuple))
     # print(number)
 
