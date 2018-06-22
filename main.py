@@ -91,10 +91,15 @@ def get_repos_from_dir(dir):
 class RepoManager(MutableSet):
     def __init__(self):
         self.repos = set()
+        # TODO Consider having something to remember about directories
+        # maybe one container for directories and their repo list
+        # and one other container for individual repos
+        # Like github is a directory
+        # and ~/.philconfig is a single repo whose parent directory doesn't matter.
 
     def status(self):
         for repo in self.repos:
-            print("repo = {}".format(repo._repo.workdir))
+            # print("repo = {}".format(repo._repo.workdir))
             if repo.has_stuff_to_push():
                 print("Repo {} has stuff to push".format(repo._repo.workdir))
 
@@ -103,6 +108,13 @@ class RepoManager(MutableSet):
         for repo in os.listdir(realpath):
             try: self.repos.add(RepoWrapper(os.path.join(github, repo)))
             except RepoWrapperError: pass
+    # TODO : Warn user of non-repos contained in directory
+
+    def report(self):
+        # TODO Say which repos have stuff to push
+        # TODO Warn if there are non-git-repos in the directory
+
+        pass
 
     def add(self, repo_dir):
         self.repos.add(RepoWrapper(repo_dir))
