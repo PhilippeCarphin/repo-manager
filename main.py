@@ -1,6 +1,7 @@
+#!/usr/local/bin/python3.7
+
 import pygit2
 import os
-from pprint import pprint
 from collections.abc import MutableSet
 
 
@@ -20,22 +21,27 @@ class RepoWrapper:
     def fetch(self, remote="origin"):
         self._repo.remotes[remote].fetch()
 
+    def branches_with_upstream(self):
+        return [b for b in self._repo.branches.local if self._repo.branches[b] is not None]
+
+    def local_branches(self):
+        return [b for b in self._repo.branches.local if self._repo.branches[b] is None]
+
     def refresh(self):
         self.info['branch'] = {
             b: self.compare_with_upstream(b)
-            for b in self._repo.branches.local
-            if self._repo.branches[b].upstream is not None
+            for b in self.branches_with_upstream()
         }
         self.info['local-only'] = [
             b
-            for b in self._repo.branches.local
-            if self._repo.branches[b].upstream is None
+            for b in self.local_branches()
         ]
         self.info['modified'], self.info['new'] = self.digested_status()
         self.info['clean'] = not (self.info['new'] or self.info['modified'])
         self.info['remotes'] = {r.name: r.url for r in self._repo.remotes}
 
     def compare_with_upstream(self, branch_name='master'):
+        branch = None
         try:
             branch = self._repo.branches[branch_name]
         except KeyError:
@@ -44,6 +50,7 @@ class RepoWrapper:
             upstream = branch.upstream
         except pygit2.GitError:
             print(self._repo.name + ": branch {} has no upstream".format(branch_name))
+            return
         return self._repo.ahead_behind(branch.target, upstream.target)
 
     def up_to_date(self):
@@ -57,6 +64,7 @@ class RepoWrapper:
             branch = self._repo.branches[branch_name]
         except KeyError:
             print(self._repo.name + "has no branch named " + branch_name)
+            return
         upstream = branch.upstream
         info_tuple = self._repo.ahead_behind(branch.target, upstream.target)
         print(info_tuple)
@@ -68,8 +76,8 @@ class RepoWrapper:
             info_tuple = self.info['branch']['master']
         except KeyError:
             print(self._repo.workdir + "has no branch named " + 'master')
-            return False
-        return self.stats['clean'] and info_tuple[1] == 0 and info_tuple[0] != 0
+            return True
+        return self.info['clean'] and info_tuple[1] == 0 and info_tuple[0] != 0
 
     def should_just_pull(self):
 
@@ -77,8 +85,8 @@ class RepoWrapper:
             info_tuple = self.info['branch']['master']
         except KeyError:
             print(self._repo.workdir + "has no branch named " + 'master')
-            return False
-        return self.stats['clean'] and info_tuple[0] == 0 and info_tuple[1] != 0
+            return True
+        return self.info['clean'] and info_tuple[0] == 0 and info_tuple[1] != 0
 
     def workdir_is_clean(self):
         return self.info['clean']
@@ -92,7 +100,7 @@ class RepoWrapper:
                 return True
 
             return False
-        except:
+        except RepoWrapperError:
             print("Could not get status for repo {}".format(self._repo.workdir))
 
     def digested_status(self):
@@ -100,14 +108,16 @@ class RepoWrapper:
         modified = [
             filepath
             for filepath, flags in st if flags in [
-                pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_INDEX_MODIFIED
+                pygit2.GIT_STATUS_WT_MODIFIED,
+                pygit2.GIT_STATUS_INDEX_MODIFIED
             ]
 
         ]
         new = [
             filepath
             for filepath, flags in st if flags in [
-                pygit2.GIT_STATUS_WT_NEW, pygit2.GIT_STATUS_INDEX_NEW
+                pygit2.GIT_STATUS_WT_NEW,
+                pygit2.GIT_STATUS_INDEX_NEW
             ]
 
         ]
@@ -115,12 +125,12 @@ class RepoWrapper:
 
     def status(self):
         st = self._repo.status()
-        for filepath, flags in self._repo.status().items():
+        for filepath, flags in st.items():
             if flags == pygit2.GIT_STATUS_WT_MODIFIED:
                 print("The file {} is modified".format(filepath))
             elif flags == pygit2.GIT_STATUS_IGNORED:
                 continue
-                print("the file {} is ignored".format(filepath))
+                # print("the file {} is ignored".format(filepath))
             elif flags == pygit2.GIT_STATUS_WT_NEW:
                 print("the file {} is new".format(filepath))
             elif flags == pygit2.GIT_STATUS_INDEX_NEW:
@@ -145,15 +155,15 @@ class RepoWrapper:
             print('\033[0;31m' "repo {} DIVERGED".format(self._repo.workdir) + '\033[0;0m')
 
 
-def get_repos_from_dir(dir):
-    realpath = os.path.expanduser(dir)
+def get_repos_from_dir(repo_dir):
+    realpath = os.path.expanduser(repo_dir)
     repos = []
 
     for repo in os.listdir(realpath):
         try:
             rw = RepoWrapper(os.path.join(github, repo))
             repos.append(rw)
-        except:
+        except RepoWrapperError:
             pass
 
     return repos
@@ -163,13 +173,13 @@ number = 0
 
 
 class RepoDir:
-    def __init__(self, dir='.'):
-        self.dir = dir
+    def __init__(self, repo_dir='.'):
+        self.dir = repo_dir
         self.repos = []
         self.non_repos = []
-        for d in os.listdir(dir):
+        for d in os.listdir(repo_dir):
             try:
-                repo = RepoWrapper(os.path.join(dir, d))
+                repo = RepoWrapper(os.path.join(repo_dir, d))
                 self.repos.append(repo)
             except RepoWrapperError:
                 self.non_repos.append(d)
@@ -196,8 +206,8 @@ class RepoManager(MutableSet):
             for repo in repo_dir:
                 repo.tell_me_what_to_do()
 
-    def add_dir(self, dir):
-        realpath = os.path.expanduser(dir)
+    def add_dir(self, repo_dir):
+        realpath = os.path.expanduser(repo_dir)
         self.repo_dirs.add(RepoDir(realpath))
 
     # TODO : Warn user of non-repos contained in directory
@@ -225,16 +235,16 @@ class RepoManager(MutableSet):
 
 
 if __name__ == "__main__":
-    repo = RepoWrapper('../flask_test/')
+    # repo = RepoWrapper('../flask_test/')
     # info = repo._repo.ahead_behind('db7ac576792ecf5041b800ec90c533400e5eae60',
     # 'a9f9007904385781d9c7ab1c6670b0293ca61095')
 
     github = os.path.expanduser('~/Documents/GitHub')
     # repo_list = get_repos_from_dir(github)
 
-    rm = RepoManager()
-    rm.add_dir(github)
-    rm.add(os.path.expanduser('~/.philconfig'))
+    # rm = RepoManager()
+    # rm.add_dir(github)
+    # rm.add(os.path.expanduser('~/.philconfig'))
 
     # repo.branch_info('master')
     # repo.status()
@@ -248,7 +258,7 @@ if __name__ == "__main__":
     # print(len(rm))
 
     # rm.status()
-    rm.status()
+    # rm.status()
     # pprint(repo.stats)
     # for b, info_tuple in repo.stats['branch'].items():
     #    print("{}:{}".format(b, info_tuple))
