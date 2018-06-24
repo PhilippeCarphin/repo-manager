@@ -12,7 +12,7 @@ class RepoWrapper:
     def __init__(self, repo_dir):
         try:
             self._repo = pygit2.Repository(os.path.join(repo_dir, '.git'))
-            self.stats = {}
+            self.info = {}
             self.refresh()
         except pygit2.GitError:
             raise RepoWrapperError()
@@ -21,19 +21,19 @@ class RepoWrapper:
         self._repo.remotes[remote].fetch()
 
     def refresh(self):
-        self.stats['branch'] = {
+        self.info['branch'] = {
             b: self.compare_with_upstream(b)
             for b in self._repo.branches.local
             if self._repo.branches[b].upstream is not None
         }
-        self.stats['local-only'] = [
+        self.info['local-only'] = [
             b
             for b in self._repo.branches.local
             if self._repo.branches[b].upstream is None
         ]
-        self.stats['modified'], self.stats['new'] = self.digested_status()
-        self.stats['clean'] = not (self.stats['new'] or self.stats['modified'])
-        self.stats['remotes'] = {r.name: r.url for r in self._repo.remotes}
+        self.info['modified'], self.info['new'] = self.digested_status()
+        self.info['clean'] = not (self.info['new'] or self.info['modified'])
+        self.info['remotes'] = {r.name: r.url for r in self._repo.remotes}
 
     def compare_with_upstream(self, branch_name='master'):
         try:
@@ -65,7 +65,7 @@ class RepoWrapper:
 
     def should_just_push(self):
         try:
-            info_tuple = self.stats['branch']['master']
+            info_tuple = self.info['branch']['master']
         except KeyError:
             print(self._repo.workdir + "has no branch named " + 'master')
             return False
@@ -74,14 +74,14 @@ class RepoWrapper:
     def should_just_pull(self):
 
         try:
-            info_tuple = self.stats['branch']['master']
+            info_tuple = self.info['branch']['master']
         except KeyError:
             print(self._repo.workdir + "has no branch named " + 'master')
             return False
         return self.stats['clean'] and info_tuple[0] == 0 and info_tuple[1] != 0
 
     def workdir_is_clean(self):
-        return self.stats['clean']
+        return self.info['clean']
 
     def has_stuff_to_push(self):
         try:
@@ -132,14 +132,15 @@ class RepoWrapper:
                 raise RepoWrapperError()
 
     def tell_me_what_to_do(self):
-        if not self.stats['clean']:
+        if not self.info['clean']:
             print('\033[0;31m'"repo {} has DIRTY work directory".format(self._repo.workdir) + '\033[0;0m')
         elif self.should_just_pull():
             print('\033[0;33m'"repo {} You can FAST FORWARD MERGE".format(self._repo.workdir) + '\033[0;0m')
         elif self.should_just_push():
             print('\033[0;33m'"repo {} You can just PUSH".format(self._repo.workdir) + '\033[0;0m')
-        elif 'master' in self.stats['branch'] and self.stats['branch']['master'] == (0, 0):
-            print('\033[0;32m'"repo {} Is clean and up to date".format(self._repo.workdir) + '\033[0;0m')
+        elif 'master' in self.info['branch'] and self.info['branch']['master'] == (0, 0):
+            pass
+            # print('\033[0;32m'"repo {} Is clean and up to date".format(self._repo.workdir) + '\033[0;0m')
         else:
             print('\033[0;31m' "repo {} DIVERGED".format(self._repo.workdir) + '\033[0;0m')
 
