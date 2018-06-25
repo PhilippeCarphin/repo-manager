@@ -172,14 +172,14 @@ def get_repos_from_dir(repo_dir):
 number = 0
 
 
-class RepoDir:
-    def __init__(self, repo_dir='.'):
-        self.dir = repo_dir
+class RepoContainer:
+    def __init__(self, container_dir='.'):
+        self.dir = container_dir
         self.repos = []
         self.non_repos = []
-        for d in os.listdir(repo_dir):
+        for d in os.listdir(container_dir):
             try:
-                repo = RepoWrapper(os.path.join(repo_dir, d))
+                repo = RepoWrapper(os.path.join(container_dir, d))
                 self.repos.append(repo)
             except RepoWrapperError:
                 self.non_repos.append(d)
@@ -210,7 +210,7 @@ class RepoManager(MutableSet):
 
     def add_dir(self, repo_dir):
         realpath = os.path.expanduser(repo_dir)
-        self.repo_dirs.add(RepoDir(realpath))
+        self.repo_dirs.add(RepoContainer(realpath))
 
     # TODO : Warn user of non-repos contained in directory
 
