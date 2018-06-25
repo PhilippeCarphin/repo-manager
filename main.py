@@ -28,6 +28,12 @@ class RepoWrapper:
         return [b for b in self._repo.branches.local if self._repo.branches[b].upstream is None]
 
     def refresh(self):
+        self.info['remotes'] = {r.name: r.url for r in self._repo.remotes}
+        try:
+            for r in self.info['remotes']:
+                self.fetch(r)
+        except pygit2.GitError:
+            pass
         self.info['branch'] = {
             b: self.compare_with_upstream(b)
             for b in self.branches_with_upstream()
@@ -35,7 +41,6 @@ class RepoWrapper:
         self.info['local-only'] = self.local_branches()
         self.info['modified'], self.info['new'] = self.digested_status()
         self.info['clean'] = not (self.info['new'] or self.info['modified'])
-        self.info['remotes'] = {r.name: r.url for r in self._repo.remotes}
 
     def compare_with_upstream(self, branch_name='master'):
         branch = None
