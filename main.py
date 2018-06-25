@@ -60,18 +60,6 @@ class RepoWrapper:
                 return False
         return True
 
-    def branch_info(self, branch_name='master'):
-        try:
-            branch = self._repo.branches[branch_name]
-        except KeyError:
-            print(self._repo.name + "has no branch named " + branch_name)
-            return
-        upstream = branch.upstream
-        info_tuple = self._repo.ahead_behind(branch.target, upstream.target)
-        print(info_tuple)
-        print('{} has {} commits that {} doesn\'t have.'.format(branch.name, info_tuple[0], upstream.name))
-        print('{} has {} commits that {} doesn\'t have.'.format(upstream.name, info_tuple[1], branch.name))
-
     def should_just_push(self):
         try:
             info_tuple = self.info['branch']['master']
@@ -81,7 +69,6 @@ class RepoWrapper:
         return self.info['clean'] and info_tuple[1] == 0 and info_tuple[0] != 0
 
     def should_just_pull(self):
-
         try:
             info_tuple = self.info['branch']['master']
         except KeyError as e:
@@ -91,18 +78,6 @@ class RepoWrapper:
 
     def workdir_is_clean(self):
         return self.info['clean']
-
-    def has_stuff_to_push(self):
-        try:
-            if self.compare_with_upstream()[0] != 0:
-                return True
-            mod, new = self.digested_status()
-            if mod or new:
-                return True
-
-            return False
-        except RepoWrapperError:
-            print("Could not get status for repo {}".format(self._repo.workdir))
 
     def digested_status(self):
         """ Returns the modified and untracked files """
@@ -117,23 +92,6 @@ class RepoWrapper:
                 pygit2.GIT_STATUS_IGNORED]]
         return modified, new, ignored
 
-    def status(self):
-        st = self._repo.status()
-        for filepath, flags in st.items():
-            if flags == pygit2.GIT_STATUS_WT_MODIFIED:
-                print("The file {} is modified".format(filepath))
-            elif flags == pygit2.GIT_STATUS_IGNORED:
-                continue
-                # print("the file {} is ignored".format(filepath))
-            elif flags == pygit2.GIT_STATUS_WT_NEW:
-                print("the file {} is new".format(filepath))
-            elif flags == pygit2.GIT_STATUS_INDEX_NEW:
-                print("the new file {} is in the index".format(filepath))
-            elif flags == pygit2.GIT_STATUS_INDEX_MODIFIED:
-                print("changes to the file {} are in the index".format(filepath))
-            else:
-                print("Unhandled flag {} for file {}".format(flags, filepath))
-                raise RepoWrapperError()
 
     @property
     def tell_me_what_to_do(self):
@@ -153,23 +111,6 @@ class RepoWrapper:
             # return '\033[0;32m'"repo {} Is clean and up to date".format(self._repo.workdir) + '\033[0;0m'
         else:
             return '\033[0;31m' "repo {} DIVERGED \033[0;0m\n".format(self._repo.workdir)
-
-
-def get_repos_from_dir(repo_dir):
-    realpath = os.path.expanduser(repo_dir)
-    repos = []
-
-    for repo in os.listdir(realpath):
-        try:
-            rw = RepoWrapper(os.path.join(github, repo))
-            repos.append(rw)
-        except RepoWrapperError:
-            pass
-
-    return repos
-
-
-number = 0
 
 
 class RepoContainer:
