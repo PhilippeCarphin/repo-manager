@@ -47,12 +47,11 @@ class RepoWrapper:
         try:
             branch = self._repo.branches[branch_name]
         except KeyError:
-            print(self._repo.name + "has no branch named " + branch_name)
+            raise RepoWrapperError(self._repo.name + "has no branch named " + branch_name)
         try:
             upstream = branch.upstream
         except pygit2.GitError:
-            print(self._repo.name + ": branch {} has no upstream".format(branch_name))
-            return
+            raise RepoWrapperError(self._repo.name + ": branch {} has no upstream".format(branch_name))
         return self._repo.ahead_behind(branch.target, upstream.target)
 
     def up_to_date(self):
@@ -76,8 +75,8 @@ class RepoWrapper:
     def should_just_push(self):
         try:
             info_tuple = self.info['branch']['master']
-        except KeyError:
-            print(self._repo.workdir + "has no branch named " + 'master')
+        except KeyError as e:
+            print("should_just_push(): KeyError : " + str(e))
             return True
         return self.info['clean'] and info_tuple[1] == 0 and info_tuple[0] != 0
 
@@ -85,8 +84,8 @@ class RepoWrapper:
 
         try:
             info_tuple = self.info['branch']['master']
-        except KeyError:
-            print(self._repo.workdir + "has no branch named " + 'master')
+        except KeyError as e:
+            print("should_just_pull(): KeyError : " + str(e))
             return True
         return self.info['clean'] and info_tuple[0] == 0 and info_tuple[1] != 0
 
@@ -136,18 +135,24 @@ class RepoWrapper:
                 print("Unhandled flag {} for file {}".format(flags, filepath))
                 raise RepoWrapperError()
 
+    @property
     def tell_me_what_to_do(self):
+        self.refresh()
         if not self.info['clean']:
-            print('\033[0;31m'"repo {} has DIRTY work directory".format(self._repo.workdir) + '\033[0;0m')
+            return '\033[0;31m'"repo {} has DIRTY work directory \033[0;0m\n".format(self._repo.workdir)
+        elif 'master' not in self.info['branch']:
+            # If master has no upstream branch, then as long as it's not dirty,
+            # leave it.
+            return ''
         elif self.should_just_pull():
-            print('\033[0;33m'"repo {} You can FAST FORWARD MERGE".format(self._repo.workdir) + '\033[0;0m')
+            return '\033[0;33m'"repo {} You can FAST FORWARD MERGE \033[0;0m\n".format(self._repo.workdir)
         elif self.should_just_push():
-            print('\033[0;33m'"repo {} You can just PUSH".format(self._repo.workdir) + '\033[0;0m')
+            return '\033[0;33m'"repo {} You can just PUSH \033[0;0m\n".format(self._repo.workdir)
         elif 'master' in self.info['branch'] and self.info['branch']['master'] == (0, 0):
-            pass
-            # print('\033[0;32m'"repo {} Is clean and up to date".format(self._repo.workdir) + '\033[0;0m')
+            return ''
+            # return '\033[0;32m'"repo {} Is clean and up to date".format(self._repo.workdir) + '\033[0;0m'
         else:
-            print('\033[0;31m' "repo {} DIVERGED".format(self._repo.workdir) + '\033[0;0m')
+            return '\033[0;31m' "repo {} DIVERGED \033[0;0m\n".format(self._repo.workdir)
 
 
 def get_repos_from_dir(repo_dir):
@@ -194,12 +199,14 @@ class RepoManager(MutableSet):
         self.repo_dirs = set()
 
     def status(self):
+        status = ""
         for repo in self.repos:
-            repo.tell_me_what_to_do()
+            status += repo.tell_me_what_to_do
 
         for repo_dir in self.repo_dirs:
             for repo in repo_dir:
-                repo.tell_me_what_to_do()
+                status += repo.tell_me_what_to_do
+        return status
 
     def add_dir(self, repo_dir):
         realpath = os.path.expanduser(repo_dir)
