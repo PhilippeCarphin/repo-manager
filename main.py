@@ -178,36 +178,16 @@ class RepoManager(MutableSet):
 
 
 if __name__ == "__main__":
-    # repo = RepoWrapper('../flask_test/')
-    # info = repo._repo.ahead_behind('db7ac576792ecf5041b800ec90c533400e5eae60',
-    # 'a9f9007904385781d9c7ab1c6670b0293ca61095')
-
     github = os.path.expanduser('~/Documents/GitHub')
-    # repo_list = get_repos_from_dir(github)
+    rm = RepoManager()
+    rm.add_dir(github)
+    rm.add(os.path.expanduser('~/.philconfig'))
 
-    # rm = RepoManager()
-    # rm.add_dir(github)
-    # rm.add(os.path.expanduser('~/.philconfig'))
-
-    # repo.branch_info('master')
-    # repo.status()
-    # print(repo.has_stuff_to_push())
-    # pprint(repo._repo.status())
-    # print(github)
-    # print([r._repo.workdir for r in repo_list])
-
-    # print(len(repo_list))
-
-    # print(len(rm))
-
-    # rm.status()
-    # rm.status()
-    # pprint(repo.stats)
-    # for b, info_tuple in repo.stats['branch'].items():
-    #    print("{}:{}".format(b, info_tuple))
-    # print(number)
-
-
+    import time
+    while True :
+        statu = rm.status()
+        print(statu)
+        time.sleep(20)
 
     # TODO If there are non-git-repos in a directory, inform user
     # TODO Do this for all remotes, or maybe configurable
@@ -215,3 +195,4 @@ if __name__ == "__main__":
     # TODO If working directory is dirty, inform user
     # TODO For all branches, compare_info = (0, !=0), do merge
     # TODO For all branches, compare_info = (!= 0, 0), do_push
+    # TODO Add priorities: for philconfig and tests for example.
