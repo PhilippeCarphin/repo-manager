@@ -22,10 +22,10 @@ class RepoWrapper:
         self._repo.remotes[remote].fetch()
 
     def branches_with_upstream(self):
-        return [b for b in self._repo.branches.local if self._repo.branches[b] is not None]
+        return [b for b in self._repo.branches.local if self._repo.branches[b].upstream is not None]
 
     def local_branches(self):
-        return [b for b in self._repo.branches.local if self._repo.branches[b] is None]
+        return [b for b in self._repo.branches.local if self._repo.branches[b].upstream is None]
 
     def refresh(self):
         self.info['branch'] = {
