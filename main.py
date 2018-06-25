@@ -39,7 +39,7 @@ class RepoWrapper:
             for b in self.branches_with_upstream()
         }
         self.info['local-only'] = self.local_branches()
-        self.info['modified'], self.info['new'] = self.digested_status()
+        self.info['modified'], self.info['new'], self.info['ignored'] = self.digested_status()
         self.info['clean'] = not (self.info['new'] or self.info['modified'])
 
     def compare_with_upstream(self, branch_name='master'):
@@ -106,24 +106,17 @@ class RepoWrapper:
             print("Could not get status for repo {}".format(self._repo.workdir))
 
     def digested_status(self):
+        """ Returns the modified and untracked files """
         st = self._repo.status().items()
-        modified = [
-            filepath
-            for filepath, flags in st if flags in [
+        modified = [filepath for filepath, flags in st if flags in [
                 pygit2.GIT_STATUS_WT_MODIFIED,
-                pygit2.GIT_STATUS_INDEX_MODIFIED
-            ]
-
-        ]
-        new = [
-            filepath
-            for filepath, flags in st if flags in [
+                pygit2.GIT_STATUS_INDEX_MODIFIED]]
+        new = [filepath for filepath, flags in st if flags in [
                 pygit2.GIT_STATUS_WT_NEW,
-                pygit2.GIT_STATUS_INDEX_NEW
-            ]
-
-        ]
-        return modified, new
+                pygit2.GIT_STATUS_INDEX_NEW]]
+        ignored = [filepath for filepath, flags in st if flags in [
+                pygit2.GIT_STATUS_IGNORED]]
+        return modified, new, ignored
 
     def status(self):
         st = self._repo.status()
