@@ -32,10 +32,7 @@ class RepoWrapper:
             b: self.compare_with_upstream(b)
             for b in self.branches_with_upstream()
         }
-        self.info['local-only'] = [
-            b
-            for b in self.local_branches()
-        ]
+        self.info['local-only'] = self.local_branches()
         self.info['modified'], self.info['new'] = self.digested_status()
         self.info['clean'] = not (self.info['new'] or self.info['modified'])
         self.info['remotes'] = {r.name: r.url for r in self._repo.remotes}
