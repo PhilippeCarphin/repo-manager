@@ -187,6 +187,9 @@ if __name__ == "__main__":
     while True :
         statu = rm.status()
         print(statu)
+        if statu == "":
+            print("everything's good!")
+            break
         time.sleep(20)
 
     # TODO If there are non-git-repos in a directory, inform user
