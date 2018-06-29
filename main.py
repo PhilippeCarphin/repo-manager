@@ -186,6 +186,7 @@ if __name__ == "__main__":
     import time
     while True :
         statu = rm.status()
+        os.system('cls' if os.name == 'nt' else 'clear')
         print(statu)
         if statu == "":
             print("everything's good!")
