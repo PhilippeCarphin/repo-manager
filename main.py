@@ -148,6 +148,8 @@ class RepoManager(MutableSet):
         for repo_dir in self.repo_dirs:
             for repo in repo_dir:
                 status += repo.tell_me_what_to_do
+            non_repo_string = '\n'.join(repo_dir.non_repos)
+            status += non_repo_string
         return status
 
     def fetch(self):
