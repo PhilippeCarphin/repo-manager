@@ -29,11 +29,11 @@ class RepoWrapper:
 
     def refresh(self):
         self.info['remotes'] = {r.name: r.url for r in self._repo.remotes}
-        try:
-            for r in self.info['remotes']:
-                self.fetch(r)
-        except pygit2.GitError:
-            pass
+        # try:
+        #     for r in self.info['remotes']:
+        #         self.fetch(r)
+        # except pygit2.GitError:
+        #     pass
         self.info['branch'] = {
             b: self.compare_with_upstream(b)
             for b in self.branches_with_upstream()
