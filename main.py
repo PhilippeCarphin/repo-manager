@@ -19,7 +19,10 @@ class RepoWrapper:
             raise RepoWrapperError()
 
     def fetch(self, remote="origin"):
-        self._repo.remotes[remote].fetch()
+        try:
+            self._repo.remotes[remote].fetch()
+        except pygit2.GitError:
+            print("Error : fetching from remote={} for repo={}".format(remote, self._repo.workdir))
 
     def branches_with_upstream(self):
         return [b for b in self._repo.branches.local if self._repo.branches[b].upstream is not None]
@@ -34,7 +37,7 @@ class RepoWrapper:
         #         self.fetch(r)
         # except pygit2.GitError:
         #     pass
-        self.info['branch'] = {
+        self.info['tracking-branches'] = {
             b: self.compare_with_upstream(b)
             for b in self.branches_with_upstream()
         }
@@ -43,7 +46,6 @@ class RepoWrapper:
         self.info['clean'] = not (self.info['new'] or self.info['modified'])
 
     def compare_with_upstream(self, branch_name='master'):
-        branch = None
         try:
             branch = self._repo.branches[branch_name]
         except KeyError:
@@ -62,7 +64,7 @@ class RepoWrapper:
 
     def should_just_push(self):
         try:
-            info_tuple = self.info['branch']['master']
+            info_tuple = self.info['tracking-branches']['master']
         except KeyError as e:
             print("should_just_push(): KeyError : " + str(e))
             return True
@@ -70,7 +72,7 @@ class RepoWrapper:
 
     def should_just_pull(self):
         try:
-            info_tuple = self.info['branch']['master']
+            info_tuple = self.info['tracking-branches']['master']
         except KeyError as e:
             print("should_just_pull(): KeyError : " + str(e))
             return True
@@ -98,7 +100,7 @@ class RepoWrapper:
         self.refresh()
         if not self.info['clean']:
             return '\033[0;31m'"repo {} has DIRTY work directory \033[0;0m\n".format(self._repo.workdir)
-        elif 'master' not in self.info['branch']:
+        elif 'master' not in self.info['tracking-branches']:
             # If master has no upstream branch, then as long as it's not dirty,
             # leave it.
             return ''
@@ -106,12 +108,11 @@ class RepoWrapper:
             return '\033[0;33m'"repo {} You can FAST FORWARD MERGE \033[0;0m\n".format(self._repo.workdir)
         elif self.should_just_push():
             return '\033[0;33m'"repo {} You can just PUSH \033[0;0m\n".format(self._repo.workdir)
-        elif 'master' in self.info['branch'] and self.info['branch']['master'] == (0, 0):
+        elif 'master' in self.info['tracking-branches'] and self.info['tracking-branches']['master'] == (0, 0):
             return ''
             # return '\033[0;32m'"repo {} Is clean and up to date".format(self._repo.workdir) + '\033[0;0m'
         else:
             return '\033[0;31m' "repo {} DIVERGED \033[0;0m\n".format(self._repo.workdir)
-
 
 class RepoContainer:
     def __init__(self, container_dir='.'):
@@ -149,6 +150,13 @@ class RepoManager(MutableSet):
                 status += repo.tell_me_what_to_do
         return status
 
+    def fetch(self):
+        for repo in self.repos:
+            repo.fetch()
+        for repo_dir in self.repo_dirs:
+            for repo in repo_dir:
+                repo.fetch()
+
     def add_dir(self, repo_dir):
         realpath = os.path.expanduser(repo_dir)
         self.repo_dirs.add(RepoContainer(realpath))
@@ -183,6 +191,7 @@ if __name__ == "__main__":
     rm.add_dir(github)
     rm.add(os.path.expanduser('~/.philconfig'))
 
+    # rm.fetch()
     import time
     while True :
         statu = rm.status()
@@ -191,7 +200,7 @@ if __name__ == "__main__":
         if statu == "":
             print("everything's good!")
             break
-        time.sleep(20)
+        time.sleep(10)
 
     # TODO If there are non-git-repos in a directory, inform user
     # TODO Do this for all remotes, or maybe configurable
