@@ -3,6 +3,16 @@
 import pygit2
 import os
 from collections.abc import MutableSet
+import getpass
+
+passwd = getpass.getpass("Please enter password for philippecarphin@github.com")
+
+class CliCredentials(pygit2.RemoteCallbacks):
+    def credentials(self, url, username_from_url, allowed_types):
+        if allowed_types == pygit2.GIT_CREDTYPE_USERPASS_PLAINTEXT:
+            return pygit2.UserPass('philippecarphin', passwd)
+        elif allowed_types == pygit2.GITCREDTYPE_USERNAME:
+            raise NotImplemented
 
 
 class RepoWrapperError(Exception):
@@ -14,13 +24,19 @@ class RepoWrapper:
         try:
             self._repo = pygit2.Repository(os.path.join(repo_dir, '.git'))
             self.info = {}
+            self.fetch()
             self.refresh()
         except pygit2.GitError:
             raise RepoWrapperError()
 
     def fetch(self, remote="origin"):
+        url=self._repo.remotes[remote].url.lower()
+        print("Fetching for {} from url {}".format(self._repo.workdir, url))
+        if not url.startswith("https://github.com/philippecarphin"):
+            return
+        print("      url is from phil's github")
         try:
-            self._repo.remotes[remote].fetch()
+            self._repo.remotes[remote].fetch(callbacks=CliCredentials())
         except pygit2.GitError:
             print("Error : fetching from remote={} for repo={}".format(remote, self._repo.workdir))
 
